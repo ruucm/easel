@@ -69,7 +69,7 @@ export default function SaveManager() {
       });
       const data = await res.json();
       if (data.ok) {
-        setLastSaved(new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+        setLastSaved(new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
         setDirty(false);
         fetchSaves();
       }
@@ -322,7 +322,7 @@ export default function SaveManager() {
                   )}
                 </div>
                 <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 1 }}>
-                  {new Date(s.updatedAt).toLocaleString("ko-KR")}
+                  {new Date(s.updatedAt).toLocaleString("en-US")}
                 </div>
               </div>
               <button
