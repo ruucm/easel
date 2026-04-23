@@ -1,27 +1,26 @@
-# 새 디자인 시스템 추가 가이드
+# Adding a Design System
 
-## 개요
+## Overview
 
-이 프로젝트는 **어댑터 패턴**으로 디자인 시스템을 관리합니다.
-새 DS를 추가하려면 어댑터 파일 1개 생성 + init.ts에 import 1줄만 추가하면 됩니다.
+This project manages design systems through an **adapter pattern**. To add a new DS, you only need to create one adapter file and add a single import line to `init.ts`.
 
-## 파일 구조
+## File layout
 
 ```
 app/design-systems/
-├── types.ts        # DesignSystemAdapter 인터페이스 (수정 불필요)
-├── registry.ts     # 어댑터 등록/조회 (수정 불필요)
-├── context.tsx     # React Context (수정 불필요)
-├── init.ts         # ★ 여기에 import 추가
-├── html.tsx        # Generic HTML 어댑터
-├── shadcn.tsx      # shadcn/ui 어댑터
-├── mui.tsx         # Material UI 어댑터
-└── yourds.tsx      # ★ 새 어댑터 파일 생성
+├── types.ts        # DesignSystemAdapter interface (do not edit)
+├── registry.ts     # Adapter registration / lookup (do not edit)
+├── context.tsx     # React Context (do not edit)
+├── init.ts         # ★ Add your import here
+├── html.tsx        # Generic HTML adapter
+├── shadcn.tsx      # shadcn/ui adapter
+├── mui.tsx         # Material UI adapter
+└── yourds.tsx      # ★ Your new adapter file
 ```
 
-## Step 1: 어댑터 파일 생성
+## Step 1: Create the adapter file
 
-`app/design-systems/yourds.tsx` 파일을 생성합니다.
+Create `app/design-systems/yourds.tsx`.
 
 ```tsx
 "use client";
@@ -31,13 +30,13 @@ import type { DesignSystemAdapter, ComponentTemplate } from "./types";
 import type { CanvasNode } from "../store/types";
 import { registerDesignSystem } from "./registry";
 
-// 외부 라이브러리 import (있다면)
+// External library imports (if any)
 // import { Button, Input } from "your-design-system";
 ```
 
-## Step 2: 컴포넌트 렌더러 구현
+## Step 2: Implement the component renderer
 
-`renderComponent`는 캔버스에 컴포넌트를 그리는 핵심 함수입니다.
+`renderComponent` is the core function that draws each component on the canvas.
 
 ```tsx
 function renderComponent(node: CanvasNode): React.ReactNode {
@@ -68,23 +67,23 @@ function renderComponent(node: CanvasNode): React.ReactNode {
       );
 
     default:
-      return null; // Frame, Text 등은 캔버스가 처리
+      return null; // Frame, Text, etc. are handled by the canvas itself
   }
 }
 ```
 
-**규칙:**
-- `node.type`으로 분기하여 JSX 반환
-- `node.componentProps`에서 props 읽기
-- Frame/Text 타입은 `null` 반환 (캔버스가 직접 처리)
-- 기본값을 항상 제공 (`p.label || "Button"`)
+**Rules:**
+- Branch on `node.type` and return JSX.
+- Read props from `node.componentProps`.
+- Return `null` for Frame/Text — the canvas handles them directly.
+- Always provide fallback defaults (`p.label || "Button"`).
 
-## Step 3: 카탈로그 정의
+## Step 3: Define the catalog
 
-좌측 Assets 패널에 표시되는 컴포넌트 목록입니다.
+This is the list of components shown in the left-hand Assets panel.
 
 ```tsx
-// 아이콘 헬퍼
+// Icon helper
 const S = ({ children, ...p }: React.SVGProps<SVGSVGElement>) => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
        stroke="currentColor" strokeWidth="1.5"
@@ -93,7 +92,7 @@ const S = ({ children, ...p }: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-// 고유 ID 생성기 (다른 DS와 겹치지 않게 시작값 조정)
+// Unique ID generator (use a prefix + starting value that won't collide with other DSes)
 let counter = 9000;
 function uid() {
   return `yourds-${++counter}-${Date.now()}`;
@@ -142,15 +141,15 @@ const catalog: ComponentTemplate[] = [
 ];
 ```
 
-**카탈로그 항목 구조:**
-- `type`: renderComponent의 switch case와 일치해야 함
-- `label`: Assets 패널에 표시되는 이름
-- `icon`: 16x16 SVG 아이콘
-- `create(cx, cy)`: 캔버스 클릭 시 생성할 노드 팩토리 함수
+**Catalog entry fields:**
+- `type` — must match a `case` in `renderComponent`.
+- `label` — displayed name in the Assets panel.
+- `icon` — 16x16 SVG icon.
+- `create(cx, cy)` — factory that returns a node when the user adds the component at `(cx, cy)`.
 
-## Step 4: AI 스키마 작성
+## Step 4: Write the AI schema
 
-AI가 디자인을 생성할 때 참고하는 스키마입니다.
+This is the schema the AI uses when generating designs.
 
 ```tsx
 const aiSchema = `Design System: Your Design System
@@ -178,86 +177,121 @@ Rules:
 `;
 ```
 
-**잘 작성하면 AI가 더 정확한 디자인을 생성합니다.** 각 컴포넌트의 props를 빠짐없이 문서화하세요.
+**The better this is written, the more accurate the AI's output.** Document every component's props exhaustively.
 
-## Step 5: Export 설정
+## Step 5: Export config
 
-디자인을 Vite 프로젝트로 내보낼 때 사용하는 설정입니다.
+Configuration used when exporting a design as a Vite project.
 
 ```tsx
 const IMPORTABLE = new Set(["YourButton", "YourInput", "YourCard"]);
 
 const exportConfig = {
-  // npm 패키지 정보 (외부 라이브러리 사용 시)
-  packageName: "your-design-system",    // 또는 "" (외부 패키지 없을 때)
-  packageVersion: "^1.0.0",             // 또는 ""
+  // npm package info (if you use an external library)
+  packageName: "your-design-system",    // or "" if none
+  packageVersion: "^1.0.0",             // or ""
 
-  // 추가 의존성
+  // Extra dependencies
   extraDependencies: {
-    // "@emotion/react": "^11.0.0",     // 필요한 경우
+    // "@emotion/react": "^11.0.0",     // if needed
   },
 
-  // HTML data-theme 속성 (테마 전환용)
-  dataTheme: undefined,                  // 또는 "your-theme"
+  // HTML data-theme attribute (for theme switching)
+  dataTheme: undefined,                  // or "your-theme"
 
-  // CSS import 문
+  // CSS imports
   cssImports: [
     // "import 'your-design-system/styles.css';",
   ],
 
-  // public/ 에서 가져올 테마 CSS 경로
-  themeCSSPath: undefined,               // 또는 "/your-theme.css"
+  // Path to a theme CSS file under public/
+  themeCSSPath: undefined,               // or "/your-theme.css"
 
-  // import 문 생성 함수
+  // Import statement generator
   generateImport: (usedTypes: string[]) => {
     if (usedTypes.length === 0) return "";
     return `import { ${usedTypes.join(", ")} } from "your-design-system";`;
   },
 
-  // import가 필요한 컴포넌트 타입 (Frame, Text 제외)
+  // Types that require imports (excluding Frame/Text)
   importableTypes: IMPORTABLE,
 };
 ```
 
-## Step 6: 어댑터 객체 조립 & 등록
+## Step 6: Assemble and register the adapter
 
 ```tsx
 const yourdsAdapter: DesignSystemAdapter = {
   id: "yourds",
   name: "Your Design System",
   description: "My awesome design system",
-  accentColor: "#7c3aed",  // UI 강조색 (hex)
-  fontFamily: "var(--font-inter), Inter, sans-serif",  // 캔버스 폰트
+  accentColor: "#7c3aed",  // UI accent color (hex)
+  fontFamily: "var(--font-inter), Inter, sans-serif",  // Canvas font
 
   renderComponent,
   catalog,
   aiSchema,
   exportConfig,
 
-  // (선택) DS 전환 시 기본 표시할 노드
+  // (optional) Default nodes to show when this DS is selected
   // defaultNodes: [...],
 };
 
-// 등록 (import 시 자동 실행)
+// Register (runs automatically when the module is imported)
 registerDesignSystem(yourdsAdapter);
 
 export default yourdsAdapter;
 ```
 
-## Step 7: init.ts에 등록
+## Step 7: Register in init.ts
 
-`app/design-systems/init.ts`에 import 한 줄 추가:
+Add a single import line to `app/design-systems/init.ts`:
 
 ```ts
 import "./html";
 import "./shadcn";
 import "./mui";
-import "./yourds";  // ← 추가
+import "./yourds";  // ← add this
 ```
 
-## Step 8: 폰트 추가 (선택)
+## Step 8: Wire up the AI guide (recommended)
 
-커스텀 Google Font가 필요한 경우 `app/layout.tsx`에 추가:
+Write a markdown file with **style rules** the AI should follow when generating or editing designs. Create `{adapterId}.md` under the project's `guides/` directory, then point the adapter's `guideFile` at it.
+
+**1) Create the guide file** — `guides/yourds.md`:
+
+```markdown
+## Your DS Design System Rules
+
+### Button Variants
+- "primary": use for the main CTA only
+- "secondary": use for cancel, back, or less important actions
+- "danger": reserved for destructive actions (delete, etc.)
+
+### Layout Patterns
+- Always wrap designs in a root Frame (display:"flex", flexDirection:"column")
+- Use generous whitespace between sections
+
+### Style Rules
+- Let component variants control color, border, padding — don't override in node.style
+- node.style should only hold layout properties: position, width, height, display, gap, margin
+```
+
+Where `aiSchema` teaches the AI about **structure (types and props)**, `guides/*.md` teaches **style judgement (which variant to use when)**. See `guides/shadcn.md`, `guides/mui.md`, and `guides/html.md` for reference.
+
+**2) Link it from the adapter** — add `guideFile` to your adapter object in `yourds.tsx`:
+
+```tsx
+const yourdsAdapter: DesignSystemAdapter = {
+  id: "yourds",
+  // ... (other fields)
+  guideFile: "guides/yourds.md",  // ← add this
+};
+```
+
+## Step 9: Add a font (optional)
+
+If your DS needs a specific Google Font, add it in `app/layout.tsx`:
 
 ```tsx
 import { Geist, Geist_Mono, Inter, Roboto, YourFont } from "next/font/google";
@@ -268,12 +302,11 @@ const yourFont = YourFont({
 });
 ```
 
-`<html>` 태그의 className에 `${yourFont.variable}` 추가 후,
-어댑터의 `fontFamily`에서 `"var(--font-yourfont), YourFont, sans-serif"` 사용.
+Add `${yourFont.variable}` to the `<html>` tag's className, then set the adapter's `fontFamily` to `"var(--font-yourfont), YourFont, sans-serif"`.
 
 ---
 
-## 전체 최소 템플릿
+## Minimal full template
 
 ```tsx
 "use client";
@@ -336,6 +369,7 @@ const mydsAdapter: DesignSystemAdapter = {
   description: "My design system",
   accentColor: "#7c3aed",
   renderComponent, catalog, aiSchema, exportConfig,
+  guideFile: "guides/myds.md", // optional but recommended
 };
 
 registerDesignSystem(mydsAdapter);
@@ -344,24 +378,58 @@ export default mydsAdapter;
 
 ---
 
-## 체크리스트
+## Verifying it works
 
-| # | 할 일 | 파일 |
-|---|-------|------|
-| 1 | 어댑터 파일 생성 | `app/design-systems/yourds.tsx` |
-| 2 | `renderComponent` 구현 | 위 파일 |
-| 3 | `catalog` 정의 | 위 파일 |
-| 4 | `aiSchema` 작성 | 위 파일 |
-| 5 | `exportConfig` 설정 | 위 파일 |
-| 6 | `registerDesignSystem()` 호출 | 위 파일 하단 |
-| 7 | init.ts에 import 추가 | `app/design-systems/init.ts` |
-| 8 | (선택) 폰트 추가 | `app/layout.tsx` |
-| 9 | 빌드 확인 | `npx next build` |
+To confirm your new adapter is wired up correctly:
 
-## 기존 어댑터 참고
+```bash
+npm run dev
+```
 
-| 어댑터 | 복잡도 | 특징 | 참고용으로 |
-|--------|--------|------|-----------|
-| `html.tsx` | 낮음 | 외부 의존성 없음, inline styles | 기본 구조 이해 |
-| `shadcn.tsx` | 중간 | 로컬 컴포넌트 import | Tailwind 기반 DS |
-| `mui.tsx` | 높음 | 외부 npm 패키지 사용 | 외부 라이브러리 DS |
+1. Open http://localhost:3000 and click the **design-system dropdown** in the bottom bar — your adapter's `name` should appear.
+2. Select it. The canvas accent color should switch to your `accentColor`, and the left-hand Assets panel should show the components from your `catalog`.
+3. Drag a component from Assets onto the canvas — you should see the JSX from `renderComponent`.
+4. Type something like "stack three buttons vertically" into the AI prompt bar — the AI uses your `aiSchema` + `guideFile` to generate a new design.
+5. Click **Export** in the toolbar. Check the downloaded zip — the `package.json` and `App.jsx` should reflect your `exportConfig`.
+
+To catch build errors in one shot:
+
+```bash
+npx next build
+```
+
+## Common mistakes
+
+| Symptom | Cause |
+|---------|-------|
+| New DS doesn't appear in the dropdown | Missing `import "./yourds";` in `init.ts` |
+| Canvas renders nothing | `renderComponent` missing a `case` for that `node.type` — it's falling through to `null` |
+| Nodes collide by ID | `uid()` counter starts at a value that overlaps another adapter's — give each adapter a unique prefix + starting offset (`html-`, `shadcn-`, `mui-`, `yourds-`, ...) |
+| AI generates the wrong types | `aiSchema` doesn't list all types + `componentProps` explicitly |
+| AI picks weird variants or styles | `guides/yourds.md` missing or too vague — see Step 8 |
+| Exported project has import errors | Missing type in `exportConfig.importableTypes`, or wrong `packageName` / version |
+| "use client" warning in the console | Forgot `"use client";` at the top of your adapter file |
+
+## Checklist
+
+| # | Task | File |
+|---|------|------|
+| 1 | Create adapter file | `app/design-systems/yourds.tsx` |
+| 2 | Implement `renderComponent` | same file |
+| 3 | Define `catalog` | same file |
+| 4 | Write `aiSchema` | same file |
+| 5 | Configure `exportConfig` | same file |
+| 6 | Call `registerDesignSystem()` | bottom of the same file |
+| 7 | Add import to `init.ts` | `app/design-systems/init.ts` |
+| 8 | Wire up AI guide | `guides/yourds.md` + adapter's `guideFile` |
+| 9 | (Optional) Add font | `app/layout.tsx` |
+| 10 | Verify with `npm run dev` | — |
+| 11 | Verify build with `npx next build` | — |
+
+## Reference adapters
+
+| Adapter | Complexity | Notes | Good reference for |
+|---------|-----------|-------|--------------------|
+| `html.tsx` | Low | No external deps, inline styles | Understanding the basic structure |
+| `shadcn.tsx` | Medium | Imports local components | Tailwind-based DSes |
+| `mui.tsx` | High | Uses an external npm package | Library-based DSes |
