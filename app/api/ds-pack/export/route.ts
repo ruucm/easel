@@ -166,7 +166,7 @@ export async function GET(req: NextRequest) {
   zip.file(
     "README.md",
     `# ${manifest.name} design system pack\n\n` +
-      `Import this pack via the "Import pack" button in Design System Canvas.\n\n` +
+      `Import this pack via the "Import pack" button in Easel.\n\n` +
       `- **id**: \`${dsId}\`\n` +
       `- **dependencies**: ${
         Object.keys(dependencies).length === 0

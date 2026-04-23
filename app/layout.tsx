@@ -23,8 +23,8 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "Design System Canvas",
-  description: "Framer-like DOM canvas for React components",
+  title: "Easel",
+  description: "Drop your design system on Easel — a canvas for real React components.",
 };
 
 export default function RootLayout({

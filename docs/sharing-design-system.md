@@ -4,7 +4,7 @@ Design systems can be **exported as a single `.dspack.zip` file** and installed 
 
 ## For teammates installing a pack
 
-1. Open Design System Canvas (`npm run dev`).
+1. Open Easel (`npm run dev`).
 2. In the **left sidebar**, click **Import pack**.
 3. Pick the `.dspack.zip` a teammate shared (Slack, Drive, email — whatever).
 4. A dialog shows progress: uploading → installing packages → done.

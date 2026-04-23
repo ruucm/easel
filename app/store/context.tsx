@@ -409,7 +409,7 @@ const defaultNodes: CanvasNode[] = [
             id: "hero-logo",
             type: "Text",
             name: "Logo",
-            text: "Design System Canvas",
+            text: "Easel",
             style: { fontSize: 18, fontWeight: 700, color: "#111827" },
             children: [],
           },

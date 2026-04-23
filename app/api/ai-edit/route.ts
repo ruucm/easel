@@ -91,7 +91,7 @@ function getModel(): ModelInfo {
 // ─── System Prompts ─────────────────────────────────────────────────
 
 function getEditPrompt(schema: string): string {
-  return `You are a design system canvas AI assistant. You modify CanvasNode objects based on user instructions.
+  return `You are Easel, an AI assistant that edits design-system components on a canvas. You modify CanvasNode objects based on user instructions.
 
 ${schema}
 
@@ -116,7 +116,7 @@ RULES:
 }
 
 function getCreatePrompt(schema: string): string {
-  return `You are a design system canvas AI assistant. You CREATE new UI designs from scratch based on user descriptions.
+  return `You are Easel, an AI assistant that creates design-system UI on a canvas. You CREATE new UI designs from scratch based on user descriptions.
 
 ${schema}
 
