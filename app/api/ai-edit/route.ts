@@ -10,6 +10,23 @@ import https from "https";
 
 import { dsSchemas } from "./schemas";
 
+const IMPORTED_SCHEMAS_DIR = path.join(process.cwd(), "app/api/ai-edit/imported-schemas");
+
+/**
+ * Look up a schema by dsId. Checks the built-in registry first, then falls
+ * back to imported schemas written by /api/ds-pack/import. Synchronous reads
+ * are fine — schema files are tiny.
+ */
+function getSchema(dsId: string): string | null {
+  if (dsSchemas[dsId]) return dsSchemas[dsId];
+  try {
+    const p = path.join(IMPORTED_SCHEMAS_DIR, `${dsId}.txt`);
+    return fs.readFileSync(p, "utf-8");
+  } catch {
+    return null;
+  }
+}
+
 // ─── OAuth Token (env → Keychain → file) ─────────────────────────────
 
 interface TokenInfo {
@@ -258,7 +275,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Get the schema for the requested design system
-  const schema = dsSchemas[dsId || "html"] || dsSchemas["html"];
+  const schema = getSchema(dsId || "html") || dsSchemas["html"];
   const modelInfo = getModel();
 
   let systemPrompt = isCreate ? getCreatePrompt(schema) : getEditPrompt(schema);

@@ -48,7 +48,13 @@ README.md          ← optional
   "guide": "guide.md",             // optional, defaults to "guide.md"
   "dependencies": {                // npm packages installed on import
     "@chakra-ui/react": "^2.8.0"
-  }
+  },
+  "publicAssets": {                // optional: files copied into the project's public/
+    "theme.css": "ds-packs/ourteam/theme.css"   // served at /ds-packs/ourteam/theme.css
+  },
+  "npmrc": ".npmrc"                // optional: written to project root if missing
+                                   //   (for private npm registries; auth token shared
+                                   //   team-internally)
 }
 ```
 
@@ -68,10 +74,15 @@ The importer adjusts relative paths at install time.
 1. `manifest.json` is validated (`id` must be lowercase slug).
 2. `adapter.tsx` → `app/design-systems/imported/{id}.tsx` (relative imports are rewritten for the new folder depth).
 3. `guide.md` → `guides/{id}.md`.
-4. `dependencies` are merged into the root `package.json`.
-5. `import "./imported/{id}";` appended to `app/design-systems/init.ts`.
-6. `npm install` runs if any dependency was added or changed.
-7. The UI reloads so Next.js picks up the new import.
+4. `aiSchema` is extracted from the adapter source and saved to `app/api/ai-edit/imported-schemas/{id}.txt` so AI generation has a server-side schema to work from.
+5. `publicAssets` are copied into the project's `public/` folder.
+6. `.npmrc` is written to the project root (only if the project doesn't already have one).
+7. `dependencies` are merged into the root `package.json`.
+8. `npm install` runs if any dependency was added or changed. Falls back to `--legacy-peer-deps` automatically on ERESOLVE errors (common for DS packages with rich peer-dep trees).
+9. `import "./imported/{id}";` appended to `app/design-systems/init.ts` (last — so Turbopack doesn't try to compile the adapter before its deps are installed).
+10. The UI reloads so Next.js picks up the new import.
+
+An install record is saved at `app/design-systems/imported/{id}.meta.json` listing every file written. Uninstall uses this record to clean up exactly what was installed (never `.npmrc`, which other packs may depend on).
 
 ## Uninstalling
 

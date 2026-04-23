@@ -2,38 +2,49 @@ import { NextRequest } from "next/server";
 import JSZip from "jszip";
 import { readFile, stat } from "fs/promises";
 import path from "path";
-import type { DSPackManifest } from "../../../design-systems/pack-types";
+import type { DSPackManifest, DSPackInstallRecord } from "../../../design-systems/pack-types";
 
 const PROJECT_ROOT = process.cwd();
 const DS_DIR = path.join(PROJECT_ROOT, "app/design-systems");
+const IMPORTED_DIR = path.join(DS_DIR, "imported");
 const GUIDES_DIR = path.join(PROJECT_ROOT, "guides");
+const PUBLIC_DIR = path.join(PROJECT_ROOT, "public");
 const PACKAGE_JSON = path.join(PROJECT_ROOT, "package.json");
 
 const ID_RE = /^[a-z][a-z0-9-]{0,40}$/;
 
-/**
- * Find the adapter source file for a DS id.
- * Looks in both app/design-systems/{id}.tsx (built-in)
- * and app/design-systems/imported/{id}.tsx (previously imported).
- */
+async function exists(p: string): Promise<boolean> {
+  try {
+    await stat(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function findAdapterPath(id: string): Promise<string | null> {
   const candidates = [
     path.join(DS_DIR, `${id}.tsx`),
-    path.join(DS_DIR, "imported", `${id}.tsx`),
+    path.join(IMPORTED_DIR, `${id}.tsx`),
   ];
   for (const p of candidates) {
-    try {
-      await stat(p);
-      return p;
-    } catch {}
+    if (await exists(p)) return p;
   }
   return null;
 }
 
+async function readInstallRecord(id: string): Promise<DSPackInstallRecord | null> {
+  try {
+    const raw = await readFile(path.join(IMPORTED_DIR, `${id}.meta.json`), "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Inverse of the import-time path rewrite: normalize an imported adapter's
- * paths back to the "standard" form (as if it lived in app/design-systems/)
- * so the exported pack re-imports cleanly on other machines.
+ * Inverse of the import-time path rewrite — produces source that can be
+ * re-imported cleanly by any machine.
  */
 function normalizeImports(src: string): string {
   return src
@@ -44,10 +55,6 @@ function normalizeImports(src: string): string {
     .replace(/from\s+["']\.\.\/\.\.\/store\/context["']/g, 'from "../store/context"');
 }
 
-/**
- * Extract external npm package names from the adapter source.
- * Ignores relative imports and `@/` aliases (those are internal).
- */
 function extractExternalImports(src: string): Set<string> {
   const packages = new Set<string>();
   const re = /(?:import|from)\s+["']([^"']+)["']/g;
@@ -55,7 +62,6 @@ function extractExternalImports(src: string): Set<string> {
   while ((m = re.exec(src)) !== null) {
     const spec = m[1];
     if (spec.startsWith(".") || spec.startsWith("@/")) continue;
-    // Scoped: @scope/name or @scope/name/sub
     if (spec.startsWith("@")) {
       const parts = spec.split("/");
       if (parts.length >= 2) packages.add(`${parts[0]}/${parts[1]}`);
@@ -99,30 +105,77 @@ export async function GET(req: NextRequest) {
     if (rootDeps[p]) dependencies[p] = rootDeps[p];
   }
 
+  // Re-include publicAssets / .npmrc if this DS was originally imported
+  // (info comes from the install record written during import).
+  const record = await readInstallRecord(dsId);
+  const publicAssets: Record<string, string> = {};
+  const publicAssetBuffers: Record<string, Buffer> = {};
+  let npmrcBuffer: Buffer | null = null;
+
+  if (record?.installedFiles) {
+    for (const rel of record.installedFiles) {
+      // Public assets — remap public/foo/bar.css ↔ zip path basename
+      if (rel.startsWith("public/")) {
+        const afterPublic = rel.slice("public/".length);
+        const zipPath = path.basename(afterPublic);
+        try {
+          const content = await readFile(path.join(PROJECT_ROOT, rel));
+          publicAssetBuffers[zipPath] = content;
+          publicAssets[zipPath] = afterPublic;
+        } catch {}
+      }
+    }
+  }
+
+  // Always include .npmrc for re-exports of imported packs — private
+  // registry tokens are commonly needed, and install-time logic skips
+  // writing it if the receiver already has one, so no harm in shipping it.
+  if (record) {
+    const npmrcPath = path.join(PROJECT_ROOT, ".npmrc");
+    if (await exists(npmrcPath)) {
+      npmrcBuffer = await readFile(npmrcPath);
+    }
+  }
+
   const manifest: DSPackManifest = {
     id: dsId,
-    name: dsId,
-    version: "1.0.0",
+    name: record?.name || dsId,
+    version: record?.version || "1.0.0",
     description: `Design system pack for ${dsId}`,
     entry: "adapter.tsx",
     guide: guideContent !== null ? "guide.md" : undefined,
     dependencies,
+    publicAssets: Object.keys(publicAssets).length > 0 ? publicAssets : undefined,
+    npmrc: npmrcBuffer ? ".npmrc" : undefined,
   };
 
   const zip = new JSZip();
   zip.file("manifest.json", JSON.stringify(manifest, null, 2) + "\n");
   zip.file("adapter.tsx", adapterSrc);
   if (guideContent !== null) zip.file("guide.md", guideContent);
+  for (const [zipPath, buf] of Object.entries(publicAssetBuffers)) {
+    zip.file(zipPath, buf);
+  }
+  if (npmrcBuffer) zip.file(".npmrc", npmrcBuffer);
+
+  const assetsNote =
+    Object.keys(publicAssets).length > 0
+      ? `\n- **publicAssets**: ${Object.keys(publicAssets).join(", ")}`
+      : "";
+  const npmrcNote = npmrcBuffer ? `\n- **.npmrc**: included (private registry auth)` : "";
   zip.file(
     "README.md",
-    `# ${dsId} design system pack\n\n` +
-      `Import this pack via the "Import DS" button in Design System Canvas.\n\n` +
+    `# ${manifest.name} design system pack\n\n` +
+      `Import this pack via the "Import pack" button in Design System Canvas.\n\n` +
       `- **id**: \`${dsId}\`\n` +
       `- **dependencies**: ${
         Object.keys(dependencies).length === 0
           ? "none"
           : Object.entries(dependencies).map(([k, v]) => `\`${k}@${v}\``).join(", ")
-      }\n`
+      }` +
+      assetsNote +
+      npmrcNote +
+      `\n`
   );
 
   const buf = await zip.generateAsync({ type: "nodebuffer" });

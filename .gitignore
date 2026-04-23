@@ -49,3 +49,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# .dspack runtime artifacts (per-user; never committed)
+/.npmrc
+/app/design-systems/imported/*
+!/app/design-systems/imported/.gitkeep
+/app/api/ai-edit/imported-schemas/
+/public/ds-packs/
+/dist/
