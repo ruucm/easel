@@ -3,6 +3,7 @@
 import {
   createContext,
   useContext,
+  useMemo,
   useReducer,
   type Dispatch,
   type ReactNode,
@@ -501,16 +502,50 @@ const initialState: CanvasState = {
   panY: 0,
 };
 
-const CanvasContext = createContext<CanvasState>(initialState);
+interface CanvasSlice {
+  nodes: CanvasNode[];
+  selectedId: string | null;
+}
+
+interface ViewportSlice {
+  zoom: number;
+  panX: number;
+  panY: number;
+}
+
+const CanvasContext = createContext<CanvasSlice>({
+  nodes: initialState.nodes,
+  selectedId: initialState.selectedId,
+});
+const ViewportContext = createContext<ViewportSlice>({
+  zoom: initialState.zoom,
+  panX: initialState.panX,
+  panY: initialState.panY,
+});
 const CanvasDispatchContext = createContext<Dispatch<CanvasAction>>(() => {});
 
 export function CanvasProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(canvasReducer, initialState);
+
+  // Split state into two slices so that panning (which changes ~60x/sec)
+  // does not re-render components that only care about nodes/selection.
+  const canvasValue = useMemo<CanvasSlice>(
+    () => ({ nodes: state.nodes, selectedId: state.selectedId }),
+    [state.nodes, state.selectedId]
+  );
+
+  const viewportValue = useMemo<ViewportSlice>(
+    () => ({ zoom: state.zoom, panX: state.panX, panY: state.panY }),
+    [state.zoom, state.panX, state.panY]
+  );
+
   return (
-    <CanvasContext.Provider value={state}>
-      <CanvasDispatchContext.Provider value={dispatch}>
-        {children}
-      </CanvasDispatchContext.Provider>
+    <CanvasContext.Provider value={canvasValue}>
+      <ViewportContext.Provider value={viewportValue}>
+        <CanvasDispatchContext.Provider value={dispatch}>
+          {children}
+        </CanvasDispatchContext.Provider>
+      </ViewportContext.Provider>
     </CanvasContext.Provider>
   );
 }
@@ -519,11 +554,15 @@ export function useCanvas() {
   return useContext(CanvasContext);
 }
 
+export function useViewport() {
+  return useContext(ViewportContext);
+}
+
 export function useCanvasDispatch() {
   return useContext(CanvasDispatchContext);
 }
 
 export function useFindNode() {
-  const state = useCanvas();
-  return (id: string) => findNode(state.nodes, id);
+  const { nodes } = useCanvas();
+  return (id: string) => findNode(nodes, id);
 }

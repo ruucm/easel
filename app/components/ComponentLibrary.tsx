@@ -1,13 +1,13 @@
 "use client";
 
 import React from "react";
-import { useCanvas, useCanvasDispatch } from "../store/context";
+import { useCanvasDispatch, useViewport } from "../store/context";
 import { useDesignSystem } from "../design-systems/context";
 import type { ComponentTemplate } from "../design-systems/types";
 import { getDesignSystem } from "../design-systems/registry";
 
 export default function ComponentLibrary() {
-  const { panX, panY, zoom } = useCanvas();
+  const { panX, panY, zoom } = useViewport();
   const dispatch = useCanvasDispatch();
   const { activeDS, activeDSId, setActiveDSId, allDS } = useDesignSystem();
 

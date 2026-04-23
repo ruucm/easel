@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useCanvas, useCanvasDispatch, useFindNode } from "../store/context";
+import { useCanvas, useCanvasDispatch, useFindNode, useViewport } from "../store/context";
 import type { CanvasNode } from "../store/types";
 import { useDesignSystem } from "../design-systems/context";
 
@@ -26,7 +26,8 @@ const TOKEN_LABELS: Record<string, string> = {
 };
 
 export default function BottomBar() {
-  const { selectedId, zoom, panX, panY } = useCanvas();
+  const { selectedId } = useCanvas();
+  const { zoom, panX, panY } = useViewport();
   const findNode = useFindNode();
   const dispatch = useCanvasDispatch();
   const { activeDS, activeDSId } = useDesignSystem();

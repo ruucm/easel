@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useCallback, useEffect, type MouseEvent } from "react";
-import { useCanvas, useCanvasDispatch } from "../store/context";
+import { useCanvas, useCanvasDispatch, useViewport } from "../store/context";
 import type { CanvasNode } from "../store/types";
 import { useDesignSystem } from "../design-systems/context";
 
@@ -158,7 +158,8 @@ const RenderNode = React.memo(function RenderNode({
 });
 
 export default function CanvasRenderer() {
-  const { nodes, selectedId, zoom, panX, panY } = useCanvas();
+  const { nodes, selectedId } = useCanvas();
+  const { zoom, panX, panY } = useViewport();
   const dispatch = useCanvasDispatch();
   const { activeDS } = useDesignSystem();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -172,37 +173,34 @@ export default function CanvasRenderer() {
     nodeY: number;
   } | null>(null);
 
-  const handleWheel = useCallback(
-    (e: WheelEvent) => {
-      e.preventDefault();
-      if (e.ctrlKey || e.metaKey) {
-        const rect = containerRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        const delta = e.deltaY > 0 ? 0.9 : 1.1;
-        const newZoom = Math.max(0.1, Math.min(5, zoom * delta));
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-        const newPanX = mx - (mx - panX) * (newZoom / zoom);
-        const newPanY = my - (my - panY) * (newZoom / zoom);
-        dispatch({ type: "SET_ZOOM", zoom: newZoom });
-        dispatch({ type: "SET_PAN", x: newPanX, y: newPanY });
-      } else {
-        dispatch({
-          type: "SET_PAN",
-          x: panX - e.deltaX,
-          y: panY - e.deltaY,
-        });
-      }
-    },
-    [zoom, panX, panY, dispatch]
-  );
+  // Keep latest viewport in a ref so the wheel listener can read fresh
+  // values without re-attaching on every pan/zoom tick.
+  const viewportRef = useRef({ zoom, panX, panY });
+  viewportRef.current = { zoom, panX, panY };
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const { zoom: z, panX: px, panY: py } = viewportRef.current;
+      if (e.ctrlKey || e.metaKey) {
+        const rect = el.getBoundingClientRect();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        const newZoom = Math.max(0.1, Math.min(5, z * delta));
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const newPanX = mx - (mx - px) * (newZoom / z);
+        const newPanY = my - (my - py) * (newZoom / z);
+        dispatch({ type: "SET_ZOOM", zoom: newZoom });
+        dispatch({ type: "SET_PAN", x: newPanX, y: newPanY });
+      } else {
+        dispatch({ type: "SET_PAN", x: px - e.deltaX, y: py - e.deltaY });
+      }
+    };
     el.addEventListener("wheel", handleWheel, { passive: false });
     return () => el.removeEventListener("wheel", handleWheel);
-  }, [handleWheel]);
+  }, [dispatch]);
 
   const handleCanvasMouseDown = (e: MouseEvent) => {
     if (e.target === e.currentTarget || (e.target as HTMLElement).dataset.canvasGrid) {
