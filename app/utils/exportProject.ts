@@ -39,8 +39,9 @@ function propsToJsx(props: Record<string, unknown>): string {
 
 function nodeToJsx(node: CanvasNode, indent: number): string {
   const pad = "  ".repeat(indent);
-  const style = styleToJsx(node.style);
-  const hasStyle = Object.keys(node.style).length > 0;
+  const nodeStyle = node.style ?? {};
+  const style = styleToJsx(nodeStyle);
+  const hasStyle = Object.keys(nodeStyle).length > 0;
 
   if (node.type === "Text") {
     if (hasStyle) {
@@ -103,7 +104,7 @@ export function generateNodeCode(node: CanvasNode, exportCfg: ExportConfig): str
 }
 
 function stripCanvasPosition(node: CanvasNode): CanvasNode {
-  const { position, left, top, ...rest } = node.style;
+  const { position, left, top, ...rest } = node.style ?? {};
   return { ...node, style: rest };
 }
 

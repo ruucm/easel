@@ -67,6 +67,8 @@ const RenderNode = React.memo(function RenderNode({
     setNearParentEdge(false);
   };
 
+  const nodeStyle: React.CSSProperties = node.style ?? {};
+
   const handleMouseDown = (e: MouseEvent) => {
     if (selectedId && selectedId !== node.id) {
       const selectedEl = document.querySelector(`[data-canvas-node="${selectedId}"]`);
@@ -82,7 +84,7 @@ const RenderNode = React.memo(function RenderNode({
 
     e.stopPropagation();
     onSelect(node.id);
-    if (node.style.position === "absolute") {
+    if (nodeStyle.position === "absolute") {
       onDragStart(node.id, e);
     }
   };
@@ -94,17 +96,17 @@ const RenderNode = React.memo(function RenderNode({
 
   if (hasChildren || node.type === "Frame") {
     wrapperStyle = {
-      ...node.style,
-      width: node.style.width ?? "auto",
-      height: node.style.height ?? "auto",
+      ...nodeStyle,
+      width: nodeStyle.width ?? "auto",
+      height: nodeStyle.height ?? "auto",
       outline: isSelected ? "2px solid #3b82f6" : undefined,
       outlineOffset: isSelected ? 2 : undefined,
-      cursor: nearParentEdge ? "move" : node.style.position === "absolute" ? "move" : "default",
+      cursor: nearParentEdge ? "move" : nodeStyle.position === "absolute" ? "move" : "default",
       userSelect: "none",
       boxSizing: "border-box",
     };
   } else {
-    const { position, left, top, width, height, ...rest } = node.style;
+    const { position, left, top, width, height, ...rest } = nodeStyle;
     // For DS components (not Text), strip ALL visual styles.
     // DS components handle their own look via variant/className props.
     // Only pass through pure layout styles to the wrapper.

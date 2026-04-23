@@ -10,11 +10,12 @@ import {
 } from "react";
 import type { CanvasState, CanvasAction, CanvasNode } from "./types";
 
-/** Ensure every node in the tree has a `children` array. */
+/** Ensure every node in the tree has a `children` array and a `style` object. */
 function normalizeNodes(nodes: unknown): CanvasNode[] {
   if (!Array.isArray(nodes)) return [];
   return nodes.map((n: any) => ({
     ...n,
+    style: n && typeof n.style === "object" && n.style !== null ? n.style : {},
     children: normalizeNodes(n.children),
   }));
 }
@@ -132,7 +133,7 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
           ...n,
           ...action.node,
           id: n.id,
-          children: action.node.children ?? n.children,
+          children: action.node.children ? normalizeNodes(action.node.children) : n.children,
           style: { ...n.style, ...(action.node.style || {}) },
         })),
       };
