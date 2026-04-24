@@ -8,6 +8,7 @@ import { DesignSystemProvider } from "./design-systems/context";
 import LeftSidebar from "./components/LeftSidebar";
 import CanvasRenderer from "./components/CanvasRenderer";
 import PropertiesPanel from "./components/PropertiesPanel";
+import LiveSync from "./components/LiveSync";
 import dynamic from "next/dynamic";
 const BottomBar = dynamic(() => import("./components/BottomBar"), { ssr: false });
 
@@ -15,6 +16,7 @@ export default function Home() {
   return (
     <DesignSystemProvider>
       <CanvasProvider>
+        <LiveSync />
         <div className="flex h-screen w-screen overflow-hidden bg-white">
           {/* Left: Layers + Assets */}
           <LeftSidebar />

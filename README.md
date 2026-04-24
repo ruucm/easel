@@ -60,6 +60,24 @@ Without any of those, the canvas still works — only the AI prompt bar is disab
 
 To override the model, set `CLAUDE_MODEL` (or `CLAUDE_CODE_MODEL` / `ANTHROPIC_MODEL` / `ANTHROPIC_DEFAULT_MODEL`). Defaults to `claude-sonnet-4-20250514`. See `.env.example`.
 
+## Drive Easel from Claude Code (MCP)
+
+An MCP server in [`mcp/`](mcp/) exposes the canvas to Claude Code so you can
+create, edit, and AI-generate components from the CLI while watching the
+browser canvas update live.
+
+```bash
+cd mcp && npm install
+claude mcp add easel -- npx tsx "$PWD/src/index.ts"
+```
+
+Then, with Easel running in a browser tab, try prompts like:
+
+> *"Switch to shadcn, then generate a sign-in form with a GitHub button."*
+> *"Make the primary button red and 2x wider."*
+
+See [`mcp/README.md`](mcp/README.md) for the full tool reference.
+
 ## Sharing a design system
 
 Team-internal DSes? Private npm packages? Both work:
