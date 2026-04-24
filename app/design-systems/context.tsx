@@ -18,6 +18,12 @@ export function DesignSystemProvider({ children }: { children: ReactNode }) {
   const activeDS = getDesignSystem(activeDSId) ?? getDesignSystem(getDefaultDesignSystemId())!;
   const allDS = getAllDesignSystems();
 
+  // Dev-only bridge for e2e tests to switch design systems.
+  if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+    (window as unknown as { __easelSetDS?: (id: string) => void }).__easelSetDS = setActiveDSId;
+    (window as unknown as { __easelDSIds?: string[] }).__easelDSIds = allDS.map((ds) => ds.id);
+  }
+
   return (
     <DesignSystemContext.Provider value={{ activeDS, activeDSId, setActiveDSId, allDS }}>
       {children}

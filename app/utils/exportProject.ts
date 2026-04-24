@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import { toPng, toJpeg, toSvg } from "html-to-image";
 import type { CanvasNode } from "../store/types";
 import type { ExportConfig } from "../design-systems/types";
 
@@ -288,6 +289,225 @@ async function fetchPublicFile(path: string): Promise<string> {
     if (res.ok) return await res.text();
   } catch {}
   return "";
+}
+
+type ImageFormat = "png" | "jpeg" | "svg";
+
+function safeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9 -]/g, "").replace(/ /g, "-") || "export";
+}
+
+function prepareForCapture(el: HTMLElement): void {
+  // Remove canvas selection chrome — outline, offset, and hover cursors would
+  // bleed into the image otherwise.
+  el.style.outline = "none";
+  el.style.outlineOffset = "0";
+  el.style.cursor = "default";
+  el.querySelectorAll<HTMLElement>("[data-canvas-node]").forEach((child) => {
+    child.style.outline = "none";
+    child.style.outlineOffset = "0";
+    child.style.cursor = "default";
+  });
+}
+
+/**
+ * Build an off-screen container, append the already-prepared clone, and return
+ * a cleanup function. Kept off-screen via `left: -99999px` so layout is real
+ * (fonts, webkit-specific rendering) while the user never sees it flash.
+ */
+function mountOffscreen(node: HTMLElement, extraStyles: Partial<CSSStyleDeclaration> = {}): () => void {
+  const host = document.createElement("div");
+  Object.assign(host.style, {
+    position: "fixed",
+    left: "-99999px",
+    top: "0",
+    pointerEvents: "none",
+    // Inherit fontFamily from body so DS fonts apply.
+    fontFamily: getComputedStyle(document.body).fontFamily,
+    ...extraStyles,
+  } as CSSStyleDeclaration);
+  host.appendChild(node);
+  document.body.appendChild(host);
+  return () => document.body.removeChild(host);
+}
+
+async function renderToDataUrl(
+  el: HTMLElement,
+  opts: { format: ImageFormat; backgroundColor?: string; width?: number; height?: number }
+): Promise<string> {
+  const commonOptions = {
+    pixelRatio: 2,
+    backgroundColor: opts.backgroundColor ?? "#ffffff",
+    cacheBust: true,
+    width: opts.width,
+    height: opts.height,
+    style: {
+      // html-to-image respects these as overrides on the root during capture.
+      margin: "0",
+    },
+  };
+  if (opts.format === "jpeg") return toJpeg(el, { ...commonOptions, quality: 0.95 });
+  if (opts.format === "svg") return toSvg(el, commonOptions);
+  return toPng(el, commonOptions);
+}
+
+function triggerDownload(dataUrl: string, fileName: string): void {
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+/** Export a single selected node as an image. */
+export async function exportNodeAsImage(
+  nodeId: string,
+  name: string,
+  format: ImageFormat = "png",
+  { returnDataUrl = false }: { returnDataUrl?: boolean } = {}
+): Promise<string | void> {
+  const source = document.querySelector<HTMLElement>(`[data-canvas-node="${nodeId}"]`);
+  if (!source) return;
+
+  const clone = source.cloneNode(true) as HTMLElement;
+  // Release from absolute positioning so the capture starts at (0,0).
+  clone.style.position = "relative";
+  clone.style.left = "auto";
+  clone.style.top = "auto";
+  // If the original didn't have an explicit width/height, carry over the
+  // rendered size so the clone matches what the user sees.
+  const rect = source.getBoundingClientRect();
+  const parentScale = getAncestorScale(source);
+  const naturalWidth = rect.width / parentScale;
+  const naturalHeight = rect.height / parentScale;
+  if (!clone.style.width) clone.style.width = `${naturalWidth}px`;
+  if (!clone.style.height) clone.style.height = `${naturalHeight}px`;
+  prepareForCapture(clone);
+
+  const cleanup = mountOffscreen(clone);
+  try {
+    const dataUrl = await renderToDataUrl(clone, {
+      format,
+      width: naturalWidth,
+      height: naturalHeight,
+      backgroundColor: format === "jpeg" ? "#ffffff" : undefined,
+    });
+    if (returnDataUrl) return dataUrl;
+    const ext = format === "jpeg" ? "jpg" : format;
+    triggerDownload(dataUrl, `${safeFileName(name)}.${ext}`);
+  } finally {
+    cleanup();
+  }
+}
+
+/** Accumulated scale factor of all transform: scale() ancestors (e.g. the pan/zoom grid). */
+function getAncestorScale(el: HTMLElement): number {
+  let scale = 1;
+  let cur: HTMLElement | null = el.parentElement;
+  while (cur) {
+    const t = getComputedStyle(cur).transform;
+    if (t && t !== "none") {
+      const match = t.match(/matrix\(([^)]+)\)/);
+      if (match) {
+        const parts = match[1].split(",").map((s) => parseFloat(s.trim()));
+        // matrix(a, b, c, d, e, f): a == scaleX, d == scaleY for scale-only.
+        if (parts.length >= 4 && !isNaN(parts[0])) scale *= parts[0];
+      }
+    }
+    cur = cur.parentElement;
+  }
+  return scale;
+}
+
+/**
+ * Export the full canvas (all top-level nodes) as a single image, trimmed to
+ * the bounding box of the content with a small padding.
+ */
+export async function exportCanvasAsImage(
+  name: string = "canvas",
+  format: ImageFormat = "png",
+  { returnDataUrl = false, padding = 40, backgroundColor = "#f1f5f9" }:
+    { returnDataUrl?: boolean; padding?: number; backgroundColor?: string } = {}
+): Promise<string | void> {
+  const grid = document.querySelector<HTMLElement>('[data-canvas-grid="true"]');
+  if (!grid) return;
+
+  // Snapshot the children's natural bounds using their own style left/top/width/height.
+  // We can't use getBoundingClientRect because the grid is transformed (zoom+pan).
+  const topNodes = Array.from(grid.children).filter(
+    (c) => c instanceof HTMLElement && c.dataset.canvasNode
+  ) as HTMLElement[];
+  if (topNodes.length === 0) return;
+
+  let minLeft = Infinity;
+  let minTop = Infinity;
+  let maxRight = -Infinity;
+  let maxBottom = -Infinity;
+
+  // Use offsetWidth/offsetHeight which reflect rendered size regardless of inline style.
+  for (const child of topNodes) {
+    const left = parseFloat(child.style.left || "0") || 0;
+    const top = parseFloat(child.style.top || "0") || 0;
+    const width = child.offsetWidth;
+    const height = child.offsetHeight;
+    minLeft = Math.min(minLeft, left);
+    minTop = Math.min(minTop, top);
+    maxRight = Math.max(maxRight, left + width);
+    maxBottom = Math.max(maxBottom, top + height);
+  }
+
+  if (!isFinite(minLeft)) return;
+
+  const contentWidth = maxRight - minLeft + padding * 2;
+  const contentHeight = maxBottom - minTop + padding * 2;
+
+  // Clone children into a clean container with no transform. Offset each by
+  // -minLeft + padding so the content sits snug with uniform margin.
+  const container = document.createElement("div");
+  Object.assign(container.style, {
+    position: "relative",
+    width: `${contentWidth}px`,
+    height: `${contentHeight}px`,
+    background: backgroundColor,
+    backgroundImage: "radial-gradient(circle, #cbd5e1 1px, transparent 1px)",
+    backgroundSize: "20px 20px",
+    fontFamily: getComputedStyle(grid).fontFamily,
+  } as CSSStyleDeclaration);
+
+  for (const original of topNodes) {
+    const clone = original.cloneNode(true) as HTMLElement;
+    const left = parseFloat(original.style.left || "0") || 0;
+    const top = parseFloat(original.style.top || "0") || 0;
+    clone.style.left = `${left - minLeft + padding}px`;
+    clone.style.top = `${top - minTop + padding}px`;
+    prepareForCapture(clone);
+    container.appendChild(clone);
+  }
+
+  const cleanup = mountOffscreen(container);
+  try {
+    const dataUrl = await renderToDataUrl(container, {
+      format,
+      width: contentWidth,
+      height: contentHeight,
+      backgroundColor,
+    });
+    if (returnDataUrl) return dataUrl;
+    const ext = format === "jpeg" ? "jpg" : format;
+    triggerDownload(dataUrl, `${safeFileName(name)}.${ext}`);
+  } finally {
+    cleanup();
+  }
+}
+
+// Dev-only bridge so end-to-end tests (Playwright) can drive image exports
+// and grab the returned data URL without fighting browser download flows.
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+  (window as unknown as { __easelImageExport?: unknown }).__easelImageExport = {
+    exportNodeAsImage,
+    exportCanvasAsImage,
+  };
 }
 
 export async function exportNodeAsViteProject(node: CanvasNode, exportCfg: ExportConfig): Promise<void> {

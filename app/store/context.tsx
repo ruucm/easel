@@ -528,6 +528,11 @@ const CanvasDispatchContext = createContext<Dispatch<CanvasAction>>(() => {});
 export function CanvasProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(canvasReducer, initialState);
 
+  // Dev-only bridge so e2e tests can dispatch actions (e.g. SELECT null).
+  if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+    (window as unknown as { __easelDispatch?: Dispatch<CanvasAction> }).__easelDispatch = dispatch;
+  }
+
   // Split state into two slices so that panning (which changes ~60x/sec)
   // does not re-render components that only care about nodes/selection.
   const canvasValue = useMemo<CanvasSlice>(

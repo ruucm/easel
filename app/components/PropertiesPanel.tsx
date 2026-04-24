@@ -2,7 +2,14 @@
 
 import { useState, useMemo } from "react";
 import { useCanvas, useCanvasDispatch, useFindNode } from "../store/context";
-import { exportNodeAsViteProject, exportNodeAsHtml, previewNode, generateNodeCode } from "../utils/exportProject";
+import {
+  exportNodeAsViteProject,
+  exportNodeAsHtml,
+  previewNode,
+  generateNodeCode,
+  exportNodeAsImage,
+  exportCanvasAsImage,
+} from "../utils/exportProject";
 import { useDesignSystem } from "../design-systems/context";
 
 export default function PropertiesPanel() {
@@ -14,10 +21,17 @@ export default function PropertiesPanel() {
 
   if (!selectedId) {
     return (
-      <div className="border-t border-gray-200 bg-white px-3 py-4">
+      <div className="border-t border-gray-200 bg-white px-3 py-4 space-y-3">
         <p className="text-xs text-gray-400 text-center">
           Select a layer to view properties
         </p>
+        <button
+          onClick={() => exportCanvasAsImage("easel-canvas", "png")}
+          className="w-full text-xs px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+          title="Download the entire canvas as a PNG image"
+        >
+          Export Canvas as Image
+        </button>
       </div>
     );
   }
@@ -89,27 +103,38 @@ export default function PropertiesPanel() {
       )}
 
       {/* Preview & Export */}
-      <div className="px-3 py-2 border-b border-gray-50 flex gap-1.5">
-        <button
-          onClick={() => previewNode(selectedId, exportCfg)}
-          className="flex-1 text-xs px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-        >
-          Preview
-        </button>
-        <button
-          onClick={() => exportNodeAsHtml(selectedId, node.name, exportCfg)}
-          className="flex-1 text-xs px-3 py-1.5 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors"
-          title="Download as a single HTML file — just double-click to open"
-        >
-          Share
-        </button>
-        <button
-          onClick={() => exportNodeAsViteProject(node, exportCfg)}
-          className="flex-1 text-xs px-3 py-1.5 bg-gray-900 text-white rounded hover:bg-gray-800 transition-colors"
-          title="Download as a Vite project (requires npm)"
-        >
-          Export
-        </button>
+      <div className="px-3 py-2 border-b border-gray-50 flex flex-col gap-1.5">
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => previewNode(selectedId, exportCfg)}
+            className="flex-1 text-xs px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          >
+            Preview
+          </button>
+          <button
+            onClick={() => exportNodeAsImage(selectedId, node.name, "png")}
+            className="flex-1 text-xs px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+            title="Download this layer as a PNG image"
+          >
+            Image
+          </button>
+        </div>
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => exportNodeAsHtml(selectedId, node.name, exportCfg)}
+            className="flex-1 text-xs px-3 py-1.5 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors"
+            title="Download as a single HTML file — just double-click to open"
+          >
+            Share
+          </button>
+          <button
+            onClick={() => exportNodeAsViteProject(node, exportCfg)}
+            className="flex-1 text-xs px-3 py-1.5 bg-gray-900 text-white rounded hover:bg-gray-800 transition-colors"
+            title="Download as a Vite project (requires npm)"
+          >
+            Export
+          </button>
+        </div>
       </div>
 
       {/* Code / Styles toggle */}

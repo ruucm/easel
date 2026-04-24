@@ -57,3 +57,6 @@ next-env.d.ts
 /app/api/ai-edit/imported-schemas/
 /public/ds-packs/
 /dist/
+
+
+test-exports/
